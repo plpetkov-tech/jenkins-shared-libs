@@ -54,10 +54,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
           type=sha,prefix={{branch}}-
 
-    - name: Copy Dockerfile to build context
-      run: |
-        mkdir -p docker/
-        cp /home/plamen/feelgood-api/migration/docker/jenkins-slsa-tools.Dockerfile docker/Dockerfile
+    # Dockerfile is already in docker/ directory from repository
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
@@ -82,7 +79,7 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -95,7 +92,7 @@ jobs:
         output-file: 'sbom.spdx.json'
 
     - name: Upload SBOM
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom-${{ github.sha }}
         path: sbom.spdx.json
