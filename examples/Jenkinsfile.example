@@ -1,0 +1,84 @@
+@Library('jenkins-shared-libs') _
+
+pipeline {
+    agent none
+    
+    parameters {
+        string(name: 'IMAGE_NAME', defaultValue: 'plpetkov-tech/my-app', description: 'Container image name (with username/org prefix)')
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Container image tag')
+        choice(name: 'SLSA_LEVEL', choices: ['3', '2', '1'], description: 'SLSA compliance level')
+        booleanParam(name: 'ENABLE_VEX_ANALYSIS', defaultValue: false, description: 'Enable VEX runtime analysis')
+    }
+    
+    environment {
+        REGISTRY = 'ghcr.io'
+        IMAGE_FULL_NAME = "${env.REGISTRY}/${params.IMAGE_NAME}:${params.IMAGE_TAG}"
+        SLSA_LEVEL = "${params.SLSA_LEVEL}"
+    }
+    
+    stages {
+        stage('SLSA Security Pipeline') {
+            steps {
+                script {
+                    // Call the shared library with configuration
+                    slsaSecurityPipeline([
+                        imageName: params.IMAGE_NAME,
+                        imageTag: params.IMAGE_TAG,
+                        registry: env.REGISTRY,
+                        slsaLevel: params.SLSA_LEVEL,
+                        enableVexAnalysis: params.ENABLE_VEX_ANALYSIS,
+                        platforms: ['linux/amd64', 'linux/arm64'],
+                        
+                        // Security configuration
+                        security: [
+                            vulnerabilityThreshold: 'HIGH',
+                            failOnCritical: true,
+                            enableSBOM: true,
+                            enableVEX: params.ENABLE_VEX_ANALYSIS
+                        ],
+                        
+                        // Build configuration
+                        build: [
+                            dockerfile: './Dockerfile',
+                            context: '.',
+                            buildArgs: [:]
+                        ],
+                        
+                        // Attestation configuration
+                        attestation: [
+                            enableProvenance: true,
+                            enableSBOM: true,
+                            enableVEX: params.ENABLE_VEX_ANALYSIS,
+                            keyless: true
+                        ]
+                    ])
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Archive SLSA artifacts
+            archiveArtifacts artifacts: 'slsa-artifacts/**/*', fingerprint: true, allowEmptyArchive: true
+            
+            // Publish security reports
+            publishHTML([
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'slsa-artifacts/reports',
+                reportFiles: 'security-report.html',
+                reportName: 'SLSA Security Report'
+            ])
+        }
+        success {
+            echo "SLSA Level ${params.SLSA_LEVEL} pipeline completed successfully!"
+            echo "Image: ${env.IMAGE_FULL_NAME}"
+            echo "SLSA artifacts available in workspace"
+        }
+        failure {
+            echo "SLSA pipeline failed. Check security reports for details."
+        }
+    }
+}

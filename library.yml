@@ -1,0 +1,50 @@
+# Jenkins Shared Library Configuration
+# SLSA Level 3 Security Pipeline Library
+
+name: SLSA Security Pipeline Library
+version: 1.0.0
+description: Comprehensive SLSA Level 3 supply chain security pipeline implementation for Jenkins
+
+# Library metadata
+metadata:
+  maintainer: DevSecOps Team
+  documentation: https://github.com/plpetkov-tech/jenkins-shared-libs
+  slsa_level: 3
+  compliance:
+    - SLSA Level 3
+    - OpenVEX
+    - CycloneDX SBOM
+    - Sigstore/Cosign
+
+# Library configuration
+configuration:
+  # Default pipeline parameters
+  defaults:
+    registry: ghcr.io
+    security_tools_image: ghcr.io/plpetkov-tech/jenkins-slsa-tools:latest
+    fulcio_url: https://fulcio.kubectl.shop
+    rekor_url: https://rekor.kubectl.shop
+    oidc_issuer: https://keycloak.kubectl.shop/realms/ci
+    vault_addr: https://vault.kubectl.shop
+    slsa_level: "3"
+    
+  # Pod template settings
+  pod_templates:
+    security_pod: kubernetes/security-pod-template.yaml
+    
+  # Security scanning thresholds
+  security:
+    vulnerability_threshold: HIGH
+    fail_on_critical: true
+    sbom_formats:
+      - cyclonedx-json
+      - spdx-json
+    vex_enabled: true
+    
+  # Build settings
+  build:
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    timeout_minutes: 60
+    parallel_stages: true
